@@ -193,7 +193,7 @@ jobs:
           
           find ../dkms-header-staging/ -type f -name ".gitignore" | xargs -i rm -f {}
 
-      - name: Install kernel headers
+      - name: Install kernel userspace headers
         working-directory: linux
         run: |
           mkdir -p ../kernel-headers
