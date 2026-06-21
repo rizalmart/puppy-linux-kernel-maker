@@ -13,12 +13,12 @@ jobs:
       image: debian:sid
 
     env:
-      BASE_VERSION: "7.0"
+      BASE_VERSION: "7.1"
       CUSTOM_VERSION: "opkm"
       TARGET_CPU_ARCH: "x86"
       
       AUFS_REPO: "https://github.com/sfjro/aufs-standalone.git"
-      AUFS_BRANCH: "aufs7.x-rcN"  # Replace with desired AUFS branch
+      AUFS_BRANCH: "aufs7.1"  # Replace with desired AUFS branch
       AUFS_PATCH_FILES: "aufs7-kbuild.patch aufs7-base.patch aufs7-mmap.patch aufs7-standalone.patch"
 
     steps:
