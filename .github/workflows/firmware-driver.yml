@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -260,15 +260,17 @@ jobs:
             -comp xz -Xdict-size 100% -b 1M -noappend -Xbcj x86            
 
       - name: Upload firmware image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-firmware-pconly
+          archive: false
           path: |
                 linux-firmware-pconly.sfs
 
       - name: Upload firmware image usrmerge
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-firmware-pconly-usrmerge
+          archive: false
           path: |
                 linux-firmware-pconly-usrmerge.sfs                
