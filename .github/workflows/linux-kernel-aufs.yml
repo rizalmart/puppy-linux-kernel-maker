@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -101,9 +101,10 @@ jobs:
               cp -f .config kernel-${KMOD_VERSION}-aufs.config
 
       - name: Upload kernel config
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kernel-${{ env.KMOD_VERSION }}-aufs-config
+          archive: false
           path: |
                 linux/kernel-${{ env.KMOD_VERSION }}-aufs.config              
           
@@ -257,7 +258,7 @@ jobs:
             -comp xz -Xdict-size 100% -b 1M -noappend -Xbcj x86  
 
       - name: Upload kernel package (traditional)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: huge-kernel-${{ env.KMOD_VERSION }}-aufs
           path: |
@@ -265,7 +266,7 @@ jobs:
                  vmlinuz
                  
       - name: Upload kernel package (usrmerge)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: huge-kernel-${{ env.KMOD_VERSION }}-aufs-usrmerge
           path: |
@@ -273,19 +274,22 @@ jobs:
                  vmlinuz
 
       - name: Upload kernel userspace headers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kernel-userspace-headers-${{ env.KMOD_VERSION }}-aufs
+          archive: false
           path: kernel-userspace-headers-${{ env.KMOD_VERSION }}-aufs.sfs
 
       - name: Upload DKMS kernel headers (traditional)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs
+          archive: false
           path: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs.sfs          
 
       - name: Upload DKMS kernel headers (usrmerge)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs-usrmerge
+          archive: false
           path: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs-usrmerge.sfs
