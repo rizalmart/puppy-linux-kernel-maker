@@ -204,10 +204,7 @@ jobs:
         run: |
           mkdir -p squashfs-root/lib/modules
           mkdir -p squashfs-root-usrmerge/usr/lib/modules
-          
-          mkdir -p kernel-dkms/lib/modules/${KMOD_VERSION}
-          mkdir -p kernel-dkms-usrmerge/usr/lib/modules/${KMOD_VERSION}
-         
+                   
           cp -arf staging/lib/modules/* squashfs-root/lib/modules/          
           cp -arf staging/lib/modules/* squashfs-root-usrmerge/usr/lib/modules/
 
@@ -229,6 +226,9 @@ jobs:
           cp -f linux/.config kernel-${KMOD_VERSION}.config
 
           xKVER=$(ls squashfs-root/lib/modules/ | head -n 1)
+          
+          mkdir -p kernel-dkms/lib/modules/${xKVER}
+          mkdir -p kernel-dkms-usrmerge/usr/lib/modules/${xKVER}          
               
           cp -arf dkms-header-staging/* squashfs-root/lib/modules/${xKVER}/
           cp -arf dkms-header-staging/* squashfs-root-usrmerge/usr/lib/modules/${xKVER}/
