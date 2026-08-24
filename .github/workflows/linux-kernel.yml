@@ -13,7 +13,7 @@ jobs:
       image: debian:sid
 
     env:
-      BASE_VERSION: "7.0"
+      BASE_VERSION: "7.2"
       CUSTOM_VERSION: "opkm"
       TARGET_CPU_ARCH: "x86"
     steps:
