@@ -31,7 +31,28 @@ jobs:
           apt-get install -y \
             build-essential bc bison flex libssl-dev libelf-dev dwarves pahole \
             squashfs-tools wget xz-utils ca-certificates gcc g++ binutils \
-            llvm clang kmod python3 curl git jq patch rsync
+            llvm clang kmod python3 curl git jq patch rsync dkms gnupg
+
+      - name: Add bcachefs repository
+        run: |
+
+          install -d -m 0755 /etc/apt/keyrings
+
+          curl -fsSL \
+            https://apt.bcachefs.org/apt.bcachefs.org.asc \
+            -o /etc/apt/keyrings/apt.bcachefs.org.asc
+
+          chmod 0644 /etc/apt/keyrings/apt.bcachefs.org.asc
+
+          cat > /etc/apt/sources.list.d/bcachefs.sources <<'EOF'
+          Types: deb
+          URIs: https://apt.bcachefs.org/unstable/
+          Suites: bcachefs-tools-release
+          Components: main
+          Signed-By: /etc/apt/keyrings/apt.bcachefs.org.asc
+          EOF
+
+          apt-get update
 
       - name: Detect latest kernel patch
         id: detect_kernel
@@ -199,6 +220,168 @@ jobs:
         run: |
           mkdir -p ../kernel-headers
           make headers_install INSTALL_HDR_PATH=../kernel-headers
+
+      - name: Build bcachefs and APFS-RW DKMS modules
+        working-directory: linux
+        run: |
+
+          echo "=================================================="
+          echo "Building external DKMS modules"
+          echo "Kernel: ${KMOD_VERSION}"
+          echo "=================================================="
+
+          # Make the custom kernel visible to DKMS.
+          #
+          # DKMS normally expects:
+          #   /lib/modules/<kernel>/build
+          #   /lib/modules/<kernel>/source
+          #
+          # Both point to our freshly prepared kernel source tree.
+          mkdir -p "/lib/modules/${KMOD_VERSION}"
+
+          ln -sfn "${GITHUB_WORKSPACE}/linux" \
+            "/lib/modules/${KMOD_VERSION}/build"
+
+          ln -sfn "${GITHUB_WORKSPACE}/linux" \
+            "/lib/modules/${KMOD_VERSION}/source"
+
+          echo "Kernel build tree:"
+          ls -ld \
+            "/lib/modules/${KMOD_VERSION}/build" \
+            "/lib/modules/${KMOD_VERSION}/source"
+
+          # Install the DKMS sources.
+          #
+          # bcachefs:
+          #   official bcachefs DKMS package
+          #
+          # APFS:
+          #   Debian sid's linux-apfs-rw DKMS package
+          apt-get install -y \
+            bcachefs-kernel-dkms \
+            apfs-dkms
+
+          echo
+          echo "Available DKMS modules:"
+          dkms status || true
+
+          echo
+          echo "=================================================="
+          echo "Building bcachefs"
+          echo "=================================================="
+
+          BCACHEFS_VERSION="$(
+            dkms status -m bcachefs 2>/dev/null \
+              | sed -n 's/.*bcachefs\/\([^, ]*\).*/\1/p' \
+              | head -n 1
+          )"
+
+          if [ -z "${BCACHEFS_VERSION}" ]; then
+            echo "ERROR: Could not determine bcachefs DKMS version"
+            dkms status || true
+            exit 1
+          fi
+
+          echo "bcachefs DKMS version: ${BCACHEFS_VERSION}"
+
+          dkms build \
+            -m bcachefs \
+            -v "${BCACHEFS_VERSION}" \
+            -k "${KMOD_VERSION}" \
+            --force
+
+          echo
+          echo "=================================================="
+          echo "Building APFS-RW"
+          echo "=================================================="
+
+          APFS_VERSION="$(
+            dkms status -m linux-apfs-rw 2>/dev/null \
+              | sed -n 's/.*linux-apfs-rw\/\([^, ]*\).*/\1/p' \
+              | head -n 1
+          )
+
+          if [ -z "${APFS_VERSION}" ]; then
+            echo "ERROR: Could not determine linux-apfs-rw DKMS version"
+            dkms status || true
+            exit 1
+          fi
+
+          echo "APFS-RW DKMS version: ${APFS_VERSION}"
+
+          dkms build \
+            -m linux-apfs-rw \
+            -v "${APFS_VERSION}" \
+            -k "${KMOD_VERSION}" \
+            --force
+
+          echo
+          echo "=================================================="
+          echo "Collecting DKMS modules"
+          echo "=================================================="
+
+          mkdir -p \
+            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms"
+
+          BCACHEFS_KO="$(
+            find \
+              "/var/lib/dkms/bcachefs/${BCACHEFS_VERSION}/${KMOD_VERSION}" \
+              -type f \
+              -name 'bcachefs.ko*' \
+              -print -quit
+          )"
+
+          APFS_KO="$(
+            find \
+              "/var/lib/dkms/linux-apfs-rw/${APFS_VERSION}/${KMOD_VERSION}" \
+              -type f \
+              -name 'apfs.ko*' \
+              -print -quit
+          )"
+
+          if [ -z "${BCACHEFS_KO}" ]; then
+            echo "ERROR: bcachefs.ko was not produced"
+            find "/var/lib/dkms/bcachefs" -type f -name '*.ko*' -print || true
+            exit 1
+          fi
+
+          if [ -z "${APFS_KO}" ]; then
+            echo "ERROR: apfs.ko was not produced"
+            find "/var/lib/dkms/linux-apfs-rw" -type f -name '*.ko*' -print || true
+            exit 1
+          fi
+
+          cp -av \
+            "${BCACHEFS_KO}" \
+            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/bcachefs.ko"
+
+          cp -av \
+            "${APFS_KO}" \
+            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/apfs.ko"
+
+          echo
+          echo "DKMS modules installed into staging:"
+          find \
+            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms" \
+            -type f \
+            -name '*.ko*' \
+            -print
+
+          # Rebuild module dependency/index files after adding
+          # the externally built modules.
+          depmod -b ../staging "${KMOD_VERSION}"
+
+          echo
+          echo "Final module information:"
+          modinfo \
+            -b "../staging" \
+            -k "${KMOD_VERSION}" \
+            bcachefs || true
+
+          modinfo \
+            -b "../staging" \
+            -k "${KMOD_VERSION}" \
+            apfs || true
 
       - name: Prepare SquashFS root
         run: |
