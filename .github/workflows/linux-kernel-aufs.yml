@@ -265,8 +265,8 @@ jobs:
           #
           # APFS:
           #   Debian sid's linux-apfs-rw DKMS package
-          apt-get install -y bcachefs-kernel-dkms apfs-dkms nvidia-open-kernel-dkms
-
+          apt-get install -y bcachefs-kernel-dkms apfs-dkms
+          
           echo
           echo "Available DKMS modules:"
           dkms status || true
@@ -320,43 +320,6 @@ jobs:
             -v "${APFS_VERSION}" \
             -k "${KMOD_VERSION}" \
             --force
-
-          # --------------------------------------------------
-          # NVIDIA OPEN KERNEL MODULE
-          # --------------------------------------------------
-
-          echo
-          echo "=================================================="
-          echo "Building NVIDIA Open Kernel Modules"
-          echo "=================================================="
-
-          NVIDIA_VERSION="$(
-            dkms status -m nvidia 2>/dev/null \
-              | sed -n 's/.*nvidia\/\([^, ]*\).*/\1/p' \
-              | head -n 1
-          )"
-
-          if [ -z "${NVIDIA_VERSION}" ]; then
-            echo "ERROR: Could not determine NVIDIA DKMS version"
-            echo
-            echo "DKMS status:"
-            dkms status || true
-            echo
-            echo "NVIDIA DKMS tree:"
-            find /var/lib/dkms -maxdepth 2 -type d -iname '*nvidia*' -print || true
-            exit 1
-          fi
-
-          echo "NVIDIA DKMS version: ${NVIDIA_VERSION}"
-
-          dkms build \
-            -m nvidia \
-            -v "${NVIDIA_VERSION}" \
-            -k "${KMOD_VERSION}" \
-            --force
-
-          echo
-          echo "NVIDIA DKMS build completed."
 
           echo
           echo "=================================================="
