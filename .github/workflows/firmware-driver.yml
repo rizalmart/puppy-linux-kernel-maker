@@ -54,7 +54,8 @@ jobs:
               "x1e80100", "qdu100", "sm8250", "kaanapali",
               "sdm845", "sa8775p", "sc8280xp", "qrb4210",
               "sm8750", "qcs6490", "vpu", "apq8096", "qcm6490", "apq8016",
-              "qcm2290", "qcs615", "aic100", "qcs8300",
+              "qcm2290", "qcs615", "aic100", "qcs8300", "hawi", "maili", "glymur", "eliza", "nord", "shikra",
+              "venus-1.8","venus-4.2","venus-5.2","venus-5.4","venus-6.0",
               #atheros
               "IPQ8074", "IPQ6018", "IPQ5018", "QCA2066", "QCA6698AQ", "QCN9074",
               #marvel
@@ -63,7 +64,7 @@ jobs:
               "dpaa2",
               #mediatek
               "mt7925","mt7987","mt7988","mt7996","mt8183","mt8186",
-              "mt8188","mt8189","mt8192","mt8195","mt8196",
+              "mt8188","mt8189","mt8192","mt8195","mt8196","mt8173"
               # ARM / phone / embedded / SoC boards
               "wil6210", "wcn36xx", "ti-connectivity", "rockchip", "amlogic_vdec",
               "ti-keystone", "r8a779x_usb3", "nxp_mc_firmware", "microchip", "siano",
