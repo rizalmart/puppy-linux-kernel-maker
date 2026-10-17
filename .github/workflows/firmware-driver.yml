@@ -134,7 +134,8 @@ jobs:
 
             #sane gt86xx
             
-            SANE_GT_URL="https://ia601702.us.archive.org/29/items/sane-gt68xx-firmware-1.0.tar/sane-gt68xx-firmware-1.0.tar.gz"
+            #SANE_GT_URL="https://ia601702.us.archive.org/29/items/sane-gt68xx-firmware-1.0.tar/sane-gt68xx-firmware-1.0.tar.gz"
+            SANE_GT_URL="https://p5n.pp.ru/~sergej/dl/2025/sane-gt68xx-firmware-1.0.tar.gz"
             SANE_GT_FILE=$(basename $SANE_GT_URL)
             SANE_GT_NAME=$(basename $SANE_GT_URL .tar.gz)
 
