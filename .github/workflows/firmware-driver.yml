@@ -64,7 +64,7 @@ jobs:
               "dpaa2",
               #mediatek
               "mt7925","mt7987","mt7988","mt7996","mt8183","mt8186",
-              "mt8188","mt8189","mt8192","mt8195","mt8196","mt8173"
+              "mt8188","mt8189","mt8192","mt8195","mt8196","mt8173",
               # ARM / phone / embedded / SoC boards
               "wil6210", "wcn36xx", "ti-connectivity", "rockchip", "amlogic_vdec",
               "ti-keystone", "r8a779x_usb3", "nxp_mc_firmware", "microchip", "siano",
