@@ -151,9 +151,6 @@ jobs:
           mkdir -p ../staging
           make modules_install INSTALL_MOD_PATH=../staging
 
-      - name: Strip unneeded symbols
-        run: find staging/lib/modules -type f -name '*.ko' -exec strip --strip-unneeded {} \;
-
       - name: Prepare DKMS kernel build tree
         working-directory: linux
         run: |
@@ -305,6 +302,9 @@ jobs:
           cd ..
           # Rebuild module dependency indices including NVIDIA modules
           depmod -b staging "${KMOD_VERSION}"
+
+      - name: Strip unneeded symbols
+        run: find staging/lib/modules -type f -name '*.ko' -exec strip --strip-unneeded {} \;
 
       - name: Prepare SquashFS root
         run: |
