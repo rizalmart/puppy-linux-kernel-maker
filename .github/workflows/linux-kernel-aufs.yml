@@ -1,4 +1,4 @@
-name: Puppy Linux Kernel Build + AUFS
+name: Puppy Linux Kernel Build + AUFS + NVIDIA
 
 on:
   # schedule:
@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Enable Debian contrib/non-free-firmware
         run: |
@@ -116,7 +116,7 @@ jobs:
         run: echo "${CUSTOM_VERSION}" > .config.localversion
 
       - name: Export KMOD_VERSION
-        run: echo "KMOD_VERSION=$KERNEL_VERSION-$(cat linux/.config.localversion)" >> $GITHUB_ENV       
+        run: echo "KMOD_VERSION=$KERNEL_VERSION-$(cat linux/.config.localversion)" >> $GITHUB_ENV        
 
       - name: Copy provided .config
         run: |
@@ -130,12 +130,11 @@ jobs:
               cp -f .config kernel-${KMOD_VERSION}-aufs.config
 
       - name: Upload kernel config
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-${{ env.KMOD_VERSION }}-aufs-config
-          archive: false
           path: |
-                linux/kernel-${{ env.KMOD_VERSION }}-aufs.config              
+                linux/kernel-${{ env.KMOD_VERSION }}-aufs.config            
           
       - name: Build kernel image
         working-directory: linux
@@ -151,9 +150,6 @@ jobs:
         run: |
           mkdir -p ../staging
           make modules_install INSTALL_MOD_PATH=../staging
-
-      - name: Strip unneeded symbols
-        run: find staging/lib/modules -type f -name '*.ko' -exec strip --strip-unneeded {} \;
 
       - name: Prepare DKMS kernel build tree
         working-directory: linux
@@ -238,13 +234,6 @@ jobs:
           echo "Kernel: ${KMOD_VERSION}"
           echo "=================================================="
 
-          # Make the custom kernel visible to DKMS.
-          #
-          # DKMS normally expects:
-          #   /lib/modules/<kernel>/build
-          #   /lib/modules/<kernel>/source
-          #
-          # Both point to our freshly prepared kernel source tree.
           mkdir -p "/lib/modules/${KMOD_VERSION}"
 
           ln -sfn "${GITHUB_WORKSPACE}/linux" \
@@ -253,28 +242,11 @@ jobs:
           ln -sfn "${GITHUB_WORKSPACE}/linux" \
             "/lib/modules/${KMOD_VERSION}/source"
 
-          echo "Kernel build tree:"
-          ls -ld \
-            "/lib/modules/${KMOD_VERSION}/build" \
-            "/lib/modules/${KMOD_VERSION}/source"
-
-          # Install the DKMS sources.
-          #
-          # bcachefs:
-          #   official bcachefs DKMS package
-          #
-          # APFS:
-          #   Debian sid's linux-apfs-rw DKMS package
           apt-get install -y bcachefs-kernel-dkms apfs-dkms
           
           echo
           echo "Available DKMS modules:"
           dkms status || true
-
-          echo
-          echo "=================================================="
-          echo "Building bcachefs"
-          echo "=================================================="
 
           BCACHEFS_VERSION="$(
             dkms status -m bcachefs 2>/dev/null \
@@ -282,24 +254,11 @@ jobs:
               | head -n 1
           )"
 
-          if [ -z "${BCACHEFS_VERSION}" ]; then
-            echo "ERROR: Could not determine bcachefs DKMS version"
-            dkms status || true
-            exit 1
-          fi
-
-          echo "bcachefs DKMS version: ${BCACHEFS_VERSION}"
-
           dkms build \
             -m bcachefs \
             -v "${BCACHEFS_VERSION}" \
             -k "${KMOD_VERSION}" \
             --force
-
-          echo
-          echo "=================================================="
-          echo "Building APFS-RW"
-          echo "=================================================="
 
           APFS_VERSION="$(
             dkms status -m linux-apfs-rw 2>/dev/null \
@@ -307,94 +266,54 @@ jobs:
               | head -n 1
           )"
 
-          if [ -z "${APFS_VERSION}" ]; then
-            echo "ERROR: Could not determine linux-apfs-rw DKMS version"
-            dkms status || true
-            exit 1
-          fi
-
-          echo "APFS-RW DKMS version: ${APFS_VERSION}"
-
           dkms build \
             -m linux-apfs-rw \
             -v "${APFS_VERSION}" \
             -k "${KMOD_VERSION}" \
             --force
 
-          echo
-          echo "=================================================="
-          echo "Collecting DKMS modules"
-          echo "=================================================="
-
           mkdir -p \
-            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms"
+            ../staging/lib/modules/${KMOD_VERSION}/updates/dkms
 
-          BCACHEFS_KO="$(
-            find \
-              "/var/lib/dkms/bcachefs/${BCACHEFS_VERSION}/${KMOD_VERSION}" \
-              -type f \
-              -name 'bcachefs.ko*' \
-              -print -quit
-          )"
+          BCACHEFS_KO="$(find "/var/lib/dkms/bcachefs/${BCACHEFS_VERSION}/${KMOD_VERSION}" -type f -name 'bcachefs.ko*' -print -quit)"
+          APFS_KO="$(find "/var/lib/dkms/linux-apfs-rw/${APFS_VERSION}/${KMOD_VERSION}" -type f -name 'apfs.ko*' -print -quit)"
 
-          APFS_KO="$(
-            find \
-              "/var/lib/dkms/linux-apfs-rw/${APFS_VERSION}/${KMOD_VERSION}" \
-              -type f \
-              -name 'apfs.ko*' \
-              -print -quit
-          )"
+          cp -av "${BCACHEFS_KO}" "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/bcachefs.ko"
+          cp -av "${APFS_KO}" "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/apfs.ko"
 
-          if [ -z "${BCACHEFS_KO}" ]; then
-            echo "ERROR: bcachefs.ko was not produced"
-            find "/var/lib/dkms/bcachefs" -type f -name '*.ko*' -print || true
-            exit 1
-          fi
+      - name: Build NVIDIA Open Source Kernel Modules
+        run: |
+          echo "=================================================="
+          echo "Building NVIDIA Open GPU Kernel Modules"
+          echo "=================================================="
 
-          if [ -z "${APFS_KO}" ]; then
-            echo "ERROR: apfs.ko was not produced"
-            find "/var/lib/dkms/linux-apfs-rw" -type f -name '*.ko*' -print || true
-            exit 1
-          fi
+          git clone https://github.com/NVIDIA/open-gpu-kernel-modules.git nvidia-modules
+          
+          cd nvidia-modules
+          
+          # Compile explicitly pointing SYSSRC to our upstream/custom kernel source
+          make -j"$(nproc)" SYSSRC=$GITHUB_WORKSPACE/linux
 
-          cp -av \
-            "${BCACHEFS_KO}" \
-            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/bcachefs.ko"
+          # Create directory inside staging updates for NVIDIA modules
+          mkdir -p ../staging/lib/modules/${KMOD_VERSION}/updates/nvidia
 
-          cp -av \
-            "${APFS_KO}" \
-            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/apfs.ko"
+          # Copy compiled .ko modules into the staging directory
+          find . -name "*.ko" -exec cp -av {} ../staging/lib/modules/${KMOD_VERSION}/updates/nvidia/ \;
 
-          echo
-          echo "DKMS modules installed into staging:"
-          find \
-            "../staging/lib/modules/${KMOD_VERSION}/updates/dkms" \
-            -type f \
-            -name '*.ko*' \
-            -print
+          cd ..
+          
+          # Rebuild module dependency indices including NVIDIA modules
+          depmod -b staging "${KMOD_VERSION}"
 
-          # Rebuild module dependency/index files after adding
-          # the externally built modules.
-          depmod -b ../staging "${KMOD_VERSION}"
-
-          echo
-          echo "Final module information:"
-          modinfo \
-            -b "../staging" \
-            -k "${KMOD_VERSION}" \
-            bcachefs || true
-
-          modinfo \
-            -b "../staging" \
-            -k "${KMOD_VERSION}" \
-            apfs || true
+      - name: Strip unneeded symbols
+        run: find staging/lib/modules -type f -name '*.ko' -exec strip --strip-unneeded {} \;
 
       - name: Prepare SquashFS root
         run: |
           mkdir -p squashfs-root/lib/modules
           mkdir -p squashfs-root-usrmerge/usr/lib/modules
-                   
-          cp -arf staging/lib/modules/* squashfs-root/lib/modules/          
+                 
+          cp -arf staging/lib/modules/* squashfs-root/lib/modules/         
           cp -arf staging/lib/modules/* squashfs-root-usrmerge/usr/lib/modules/
 
           for mdir in squashfs-root/lib/modules squashfs-root-usrmerge/usr/lib/modules
@@ -417,7 +336,7 @@ jobs:
           xKVER=$(ls squashfs-root/lib/modules/ | head -n 1)
           
           mkdir -p kernel-dkms/lib/modules/${xKVER}
-          mkdir -p kernel-dkms-usrmerge/usr/lib/modules/${xKVER}          
+          mkdir -p kernel-dkms-usrmerge/usr/lib/modules/${xKVER}         
               
           cp -arf dkms-header-staging/* squashfs-root/lib/modules/${xKVER}/
           cp -arf dkms-header-staging/* squashfs-root-usrmerge/usr/lib/modules/${xKVER}/
@@ -449,38 +368,35 @@ jobs:
             -comp xz -Xdict-size 100% -b 1M -noappend -Xbcj x86  
 
       - name: Upload kernel package (traditional)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: huge-kernel-${{ env.KMOD_VERSION }}-aufs
           path: |
-                 huge-kernel-${{ env.KMOD_VERSION }}-aufs.sfs
-                 vmlinuz
-                 
+                     huge-kernel-${{ env.KMOD_VERSION }}-aufs.sfs
+                     vmlinuz
+                     
       - name: Upload kernel package (usrmerge)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: huge-kernel-${{ env.KMOD_VERSION }}-aufs-usrmerge
           path: |
-                 huge-kernel-${{ env.KMOD_VERSION }}-aufs-usrmerge.sfs
-                 vmlinuz
+                     huge-kernel-${{ env.KMOD_VERSION }}-aufs-usrmerge.sfs
+                     vmlinuz
 
       - name: Upload kernel userspace headers
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-userspace-headers-${{ env.KMOD_VERSION }}-aufs
-          archive: false
           path: kernel-userspace-headers-${{ env.KMOD_VERSION }}-aufs.sfs
 
       - name: Upload DKMS kernel headers (traditional)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs
-          archive: false
-          path: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs.sfs          
+          path: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs.sfs         
 
       - name: Upload DKMS kernel headers (usrmerge)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs-usrmerge
-          archive: false
           path: kernel-dkms-headers-${{ env.KMOD_VERSION }}-aufs-usrmerge.sfs
