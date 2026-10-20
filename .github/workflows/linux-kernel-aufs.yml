@@ -1,4 +1,4 @@
-name: Puppy Linux Kernel Build + AUFS + NVIDIA
+name: Puppy Linux Kernel Build + AUFS
 
 on:
   # schedule:
