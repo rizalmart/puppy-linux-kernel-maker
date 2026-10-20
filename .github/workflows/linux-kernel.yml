@@ -98,9 +98,6 @@ jobs:
           mkdir -p ../staging
           make modules_install INSTALL_MOD_PATH=../staging
 
-      - name: Strip unneeded symbols
-        run: find staging/lib/modules -type f -name '*.ko' -exec strip --strip-unneeded {} \;
-
       - name: Prepare DKMS kernel build tree
         working-directory: linux
         run: |
@@ -174,6 +171,89 @@ jobs:
         run: |
           mkdir -p ../kernel-headers
           make headers_install INSTALL_HDR_PATH=../kernel-headers
+
+      - name: Build bcachefs and APFS-RW DKMS modules
+        working-directory: linux
+        run: |
+
+          echo "=================================================="
+          echo "Building external DKMS modules"
+          echo "Kernel: ${KMOD_VERSION}"
+          echo "=================================================="
+
+          mkdir -p "/lib/modules/${KMOD_VERSION}"
+
+          ln -sfn "${GITHUB_WORKSPACE}/linux" \
+            "/lib/modules/${KMOD_VERSION}/build"
+
+          ln -sfn "${GITHUB_WORKSPACE}/linux" \
+            "/lib/modules/${KMOD_VERSION}/source"
+
+          apt-get install -y bcachefs-kernel-dkms apfs-dkms
+          
+          echo
+          echo "Available DKMS modules:"
+          dkms status || true
+
+          BCACHEFS_VERSION="$(
+            dkms status -m bcachefs 2>/dev/null \
+              | sed -n 's/.*bcachefs\/\([^, ]*\).*/\1/p' \
+              | head -n 1
+          )"
+
+          dkms build \
+            -m bcachefs \
+            -v "${BCACHEFS_VERSION}" \
+            -k "${KMOD_VERSION}" \
+            --force
+
+          APFS_VERSION="$(
+            dkms status -m linux-apfs-rw 2>/dev/null \
+              | sed -n 's/.*linux-apfs-rw\/\([^, ]*\).*/\1/p' \
+              | head -n 1
+          )"
+
+          dkms build \
+            -m linux-apfs-rw \
+            -v "${APFS_VERSION}" \
+            -k "${KMOD_VERSION}" \
+            --force
+
+          mkdir -p \
+            ../staging/lib/modules/${KMOD_VERSION}/updates/dkms
+
+          BCACHEFS_KO="$(find "/var/lib/dkms/bcachefs/${BCACHEFS_VERSION}/${KMOD_VERSION}" -type f -name 'bcachefs.ko*' -print -quit)"
+          APFS_KO="$(find "/var/lib/dkms/linux-apfs-rw/${APFS_VERSION}/${KMOD_VERSION}" -type f -name 'apfs.ko*' -print -quit)"
+
+          cp -av "${BCACHEFS_KO}" "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/bcachefs.ko"
+          cp -av "${APFS_KO}" "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/apfs.ko"
+
+      - name: Build NVIDIA Open Source Kernel Modules
+        run: |
+          echo "=================================================="
+          echo "Building NVIDIA Open GPU Kernel Modules"
+          echo "=================================================="
+
+          git clone https://github.com/NVIDIA/open-gpu-kernel-modules.git nvidia-modules
+          
+          cd nvidia-modules
+          
+          # Compile explicitly pointing SYSSRC to our upstream/custom kernel source
+          make -j"$(nproc)" SYSSRC=$GITHUB_WORKSPACE/linux
+
+          # Create directory inside staging updates for NVIDIA modules
+          mkdir -p ../staging/lib/modules/${KMOD_VERSION}/updates/nvidia
+
+          # Copy compiled .ko modules into the staging directory
+          find . -name "*.ko" -exec cp -av {} ../staging/lib/modules/${KMOD_VERSION}/updates/nvidia/ \;
+
+          cd ..
+          
+          # Rebuild module dependency indices including NVIDIA modules
+          depmod -b staging "${KMOD_VERSION}"
+
+      - name: Strip unneeded symbols
+        run: find staging/lib/modules -type f -name '*.ko' -exec strip --strip-unneeded {} \;
 
       - name: Prepare SquashFS root
         run: |
