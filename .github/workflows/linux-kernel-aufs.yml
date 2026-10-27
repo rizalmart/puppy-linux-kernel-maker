@@ -234,13 +234,15 @@ jobs:
           echo "Kernel: ${KMOD_VERSION}"
           echo "=================================================="
 
-          mkdir -p "/lib/modules/${KMOD_VERSION}"
+          xKVER=$(ls ../staging/lib/modules/ | head -n 1)
+
+          mkdir -p "/lib/modules/${xKVER}"
 
           ln -sfn "${GITHUB_WORKSPACE}/linux" \
-            "/lib/modules/${KMOD_VERSION}/build"
+            "/lib/modules/${xKVER}/build"
 
           ln -sfn "${GITHUB_WORKSPACE}/linux" \
-            "/lib/modules/${KMOD_VERSION}/source"
+            "/lib/modules/${xKVER}/source"
 
           apt-get install -y bcachefs-kernel-dkms apfs-dkms
           
@@ -273,13 +275,13 @@ jobs:
             --force
 
           mkdir -p \
-            ../staging/lib/modules/${KMOD_VERSION}/updates/dkms
+            ../staging/lib/modules/${xKVER}/updates/dkms
 
-          BCACHEFS_KO="$(find "/var/lib/dkms/bcachefs/${BCACHEFS_VERSION}/${KMOD_VERSION}" -type f -name 'bcachefs.ko*' -print -quit)"
-          APFS_KO="$(find "/var/lib/dkms/linux-apfs-rw/${APFS_VERSION}/${KMOD_VERSION}" -type f -name 'apfs.ko*' -print -quit)"
+          BCACHEFS_KO="$(find "/var/lib/dkms/bcachefs/${BCACHEFS_VERSION}/${xKVER}" -type f -name 'bcachefs.ko*' -print -quit)"
+          APFS_KO="$(find "/var/lib/dkms/linux-apfs-rw/${APFS_VERSION}/${xKVER}" -type f -name 'apfs.ko*' -print -quit)"
 
-          cp -av "${BCACHEFS_KO}" "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/bcachefs.ko"
-          cp -av "${APFS_KO}" "../staging/lib/modules/${KMOD_VERSION}/updates/dkms/apfs.ko"
+          cp -av "${BCACHEFS_KO}" "../staging/lib/modules/${xKVER}/updates/dkms/bcachefs.ko"
+          cp -av "${APFS_KO}" "../staging/lib/modules/${xKVER}/updates/dkms/apfs.ko"
 
       - name: Build NVIDIA Open Source Kernel Modules
         run: |
@@ -287,23 +289,25 @@ jobs:
           echo "Building NVIDIA Open GPU Kernel Modules"
           echo "=================================================="
 
+           xKVER=$(ls ./staging/lib/modules/ | head -n 1)
+
           git clone https://github.com/NVIDIA/open-gpu-kernel-modules.git nvidia-modules
-          
+
           cd nvidia-modules
           
           # Compile explicitly pointing SYSSRC to our upstream/custom kernel source
           make -j"$(nproc)" SYSSRC=$GITHUB_WORKSPACE/linux
 
           # Create directory inside staging updates for NVIDIA modules
-          mkdir -p ../staging/lib/modules/${KMOD_VERSION}/updates/nvidia
+          mkdir -p ../staging/lib/modules/${xKVER}/updates/nvidia
 
           # Copy compiled .ko modules into the staging directory
-          find . -name "*.ko" -exec cp -av {} ../staging/lib/modules/${KMOD_VERSION}/updates/nvidia/ \;
+          find . -name "*.ko" -exec cp -av {} ../staging/lib/modules/${xKVER}/updates/nvidia/ \;
 
           cd ..
           
           # Rebuild module dependency indices including NVIDIA modules
-          depmod -b staging "${KMOD_VERSION}"
+          depmod -b staging "${xKVER}"
 
       - name: Strip unneeded symbols
         run: find staging/lib/modules -type f -name '*.ko' -exec strip --strip-unneeded {} \;
