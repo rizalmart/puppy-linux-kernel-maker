@@ -229,12 +229,12 @@ jobs:
         working-directory: linux
         run: |
 
+          xKVER=$(ls ../staging/lib/modules/ | head -n 1)
+          
           echo "=================================================="
           echo "Building external DKMS modules"
-          echo "Kernel: ${KMOD_VERSION}"
+          echo "Kernel: ${xKVER}"
           echo "=================================================="
-
-          xKVER=$(ls ../staging/lib/modules/ | head -n 1)
 
           mkdir -p "/lib/modules/${xKVER}"
 
@@ -259,7 +259,7 @@ jobs:
           dkms build \
             -m bcachefs \
             -v "${BCACHEFS_VERSION}" \
-            -k "${KMOD_VERSION}" \
+            -k "${xKVER}" \
             --force
 
           APFS_VERSION="$(
@@ -271,7 +271,7 @@ jobs:
           dkms build \
             -m linux-apfs-rw \
             -v "${APFS_VERSION}" \
-            -k "${KMOD_VERSION}" \
+            -k "${xKVER}" \
             --force
 
           mkdir -p \
@@ -289,7 +289,7 @@ jobs:
           echo "Building NVIDIA Open GPU Kernel Modules"
           echo "=================================================="
 
-           xKVER=$(ls ./staging/lib/modules/ | head -n 1)
+          xKVER=$(ls ./staging/lib/modules/ | head -n 1)
 
           git clone https://github.com/NVIDIA/open-gpu-kernel-modules.git nvidia-modules
 
