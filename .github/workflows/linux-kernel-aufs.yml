@@ -23,7 +23,7 @@ jobs:
 
       BORE_REPO: "https://github.com/firelzrd/bore-scheduler.git"
       BORE_BRANCH: "main"
-      BORE_PATCH_DIR: "patches"      
+      BORE_PATCH_FILE: "0001-linux7.3-rc2-bore-7.0.0.patch"
 
     steps:
       - name: Checkout repository
@@ -96,12 +96,11 @@ jobs:
           tar -xf linux-$KERNEL_VERSION.tar.xz
           mv linux-$KERNEL_VERSION linux
 
-      - name: Clone AUFS repository
-        run: git clone --depth=1 --branch $AUFS_BRANCH $AUFS_REPO aufs
-
       - name: Apply AUFS patches
         run: |
           set -e
+          
+          git clone --depth=1 --branch $AUFS_BRANCH $AUFS_REPO aufs          
           cd linux
           PATCH_DIR="../aufs"
           cp -rf $PATCH_DIR/fs ./ 
@@ -115,51 +114,15 @@ jobs:
             fi
           done
 
-      - name: Apply BORE scheduler patch
-        working-directory: linux
-        shell: bash
+      - name: Apply AUFS patches
         run: |
-        
           set -e
-
-          PATCH_ROOT="../bore-scheduler/${BORE_PATCH_DIR}"
-
-          # Extract kernel major.minor version (e.g. 7.3.3 -> 7.3)
-          PBASE_SERIES="$(printf '%s\n' "$BASE_VERSION" | cut -d. -f1-2)"
-
-          echo "Looking for a BORE patch matching Linux ${PBASE_SERIES}..."
-
-          # Find BORE stable patches matching the kernel series.
-          mapfile -t PATCHES < <(
-            find "$PATCH_ROOT" -maxdepth 1 -type f \
-              -name "*-linux${PBASE_SERIES}-*-bore-*.patch" \
-              | sort -V
-          )
-
-          if [ "${#PATCHES[@]}" -eq 0 ]; then
-            echo "::error::No BORE patch found for Linux ${BASE_SERIES} under ${PATCH_ROOT}"
-            echo "Inspect the upstream patches directory and update BORE_PATCH_DIR or the matching path."
-            exit 1
-          fi
-
-          # Prefer the stable patch series when both stable and testing
-          # contain a patch for the requested kernel series.
-          SELECTED_PATCH=""
-          for candidate in "${PATCHES[@]}"; do
-            if [[ "$candidate" == *"/stable/"* ]]; then
-              SELECTED_PATCH="$candidate"
-            fi
-          done
-
-          if [ -z "$SELECTED_PATCH" ]; then
-            SELECTED_PATCH="${PATCHES[-1]}"
-            echo "No stable BORE patch found; using the latest matching patch:"
-          fi
-
-          echo "Applying ${SELECTED_PATCH}"
-          patch --batch --forward --dry-run -p1 < "$SELECTED_PATCH"
-          patch --batch --forward -p1 < "$SELECTED_PATCH"          
-
+          
+          git clone --depth=1 --branch $BORE_BRANCH $BORE_REPO bore-scheduler          
+          cd linux
+          PATCH_DIR="../bore-scheduler/stable"
+          patch -p1 < "$PATCH_DIR/$BORE_PATCH_FILE" || echo "Patch $patch failed, skipping"
+          
       - name: Set custom version string
         working-directory: linux
         run: echo "${CUSTOM_VERSION}" > .config.localversion
