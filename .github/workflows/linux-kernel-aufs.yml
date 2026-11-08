@@ -114,13 +114,13 @@ jobs:
             fi
           done
 
-      - name: Apply AUFS patches
+      - name: Apply BORE scheduler patches
         run: |
           set -e
           
           git clone --depth=1 --branch $BORE_BRANCH $BORE_REPO bore-scheduler          
           cd linux
-          PATCH_DIR="../bore-scheduler/stable"
+          PATCH_DIR="../bore-scheduler/patches/stable"
           patch -p1 < "$PATCH_DIR/$BORE_PATCH_FILE" || echo "Patch $patch failed, skipping"
           
       - name: Set custom version string
