@@ -1,4 +1,4 @@
-name: Puppy Linux Kernel Build + AUFS
+name: Puppy Linux Kernel Build + AUFS + BORE
 
 on:
   # schedule:
@@ -20,6 +20,10 @@ jobs:
       AUFS_REPO: "https://github.com/sfjro/aufs-standalone.git"
       AUFS_BRANCH: "aufs7.3"  # Replace with desired AUFS branch
       AUFS_PATCH_FILES: "aufs7-kbuild.patch aufs7-base.patch aufs7-mmap.patch aufs7-standalone.patch"
+
+      BORE_REPO: "https://github.com/firelzrd/bore-scheduler.git"
+      BORE_BRANCH: "main"
+      BORE_PATCH_DIR: "patches"      
 
     steps:
       - name: Checkout repository
@@ -110,6 +114,51 @@ jobs:
               patch -p1 < "$PATCH_DIR/$patch" || echo "Patch $patch failed, skipping"
             fi
           done
+
+      - name: Apply BORE scheduler patch
+        working-directory: linux
+        shell: bash
+        run: |
+        
+          set -e
+
+          PATCH_ROOT="../bore-scheduler/${BORE_PATCH_DIR}"
+
+          # Extract kernel major.minor version (e.g. 7.3.3 -> 7.3)
+          PBASE_SERIES="$(printf '%s\n' "$BASE_VERSION" | cut -d. -f1-2)"
+
+          echo "Looking for a BORE patch matching Linux ${PBASE_SERIES}..."
+
+          # Find BORE stable patches matching the kernel series.
+          mapfile -t PATCHES < <(
+            find "$PATCH_ROOT" -maxdepth 1 -type f \
+              -name "*-linux${PBASE_SERIES}-*-bore-*.patch" \
+              | sort -V
+          )
+
+          if [ "${#PATCHES[@]}" -eq 0 ]; then
+            echo "::error::No BORE patch found for Linux ${BASE_SERIES} under ${PATCH_ROOT}"
+            echo "Inspect the upstream patches directory and update BORE_PATCH_DIR or the matching path."
+            exit 1
+          fi
+
+          # Prefer the stable patch series when both stable and testing
+          # contain a patch for the requested kernel series.
+          SELECTED_PATCH=""
+          for candidate in "${PATCHES[@]}"; do
+            if [[ "$candidate" == *"/stable/"* ]]; then
+              SELECTED_PATCH="$candidate"
+            fi
+          done
+
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH="${PATCHES[-1]}"
+            echo "No stable BORE patch found; using the latest matching patch:"
+          fi
+
+          echo "Applying ${SELECTED_PATCH}"
+          patch --batch --forward --dry-run -p1 < "$SELECTED_PATCH"
+          patch --batch --forward -p1 < "$SELECTED_PATCH"          
 
       - name: Set custom version string
         working-directory: linux
