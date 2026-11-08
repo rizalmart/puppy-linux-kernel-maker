@@ -16,6 +16,11 @@ jobs:
       BASE_VERSION: "7.3"
       CUSTOM_VERSION: "opkm"
       TARGET_CPU_ARCH: "x86"
+
+      BORE_REPO: "https://github.com/firelzrd/bore-scheduler.git"
+      BORE_BRANCH: "main"
+      BORE_PATCH_FILE: "0001-linux7.3-rc2-bore-7.0.0.patch"
+      
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -56,6 +61,15 @@ jobs:
           wget https://cdn.kernel.org/pub/linux/kernel/v${BASE_VERSION%%.*}.x/linux-$KERNEL_VERSION.tar.xz
           tar -xf linux-$KERNEL_VERSION.tar.xz
           mv linux-$KERNEL_VERSION linux
+
+      - name: Apply BORE scheduler patches
+        run: |
+          set -e
+          
+          git clone --depth=1 --branch $BORE_BRANCH $BORE_REPO bore-scheduler          
+          cd linux
+          PATCH_DIR="../bore-scheduler/patches/stable"
+          patch -p1 < "$PATCH_DIR/$BORE_PATCH_FILE" || echo "Patch $patch failed, skipping"          
 
       - name: Set custom version string
         working-directory: linux
