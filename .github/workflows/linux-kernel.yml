@@ -69,7 +69,7 @@ jobs:
           git clone --depth=1 --branch $BORE_BRANCH $BORE_REPO bore-scheduler          
           cd linux
           PATCH_DIR="../bore-scheduler/patches/stable"
-          patch -p1 < "$PATCH_DIR/$BORE_PATCH_FILE" || echo "Patch $patch failed, skipping"          
+          patch -p1 < "$PATCH_DIR/$BORE_PATCH_FILE" || echo "Patch $BORE_PATCH_FILE failed, skipping"          
 
       - name: Set custom version string
         working-directory: linux
