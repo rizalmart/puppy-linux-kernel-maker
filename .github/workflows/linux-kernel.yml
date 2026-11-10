@@ -1,4 +1,4 @@
-name: Puppy Linux Kernel Build
+name: Puppy Linux Kernel Build + BORE
 
 on:
   # schedule:
